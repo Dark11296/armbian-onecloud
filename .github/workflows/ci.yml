@@ -194,10 +194,7 @@ jobs:
         BRANCH:
           - current
         RELEASE:
-          - noble
           - bookworm
-          - trixie
-          - sid
         TYPE:
           - minimal
           - cli
