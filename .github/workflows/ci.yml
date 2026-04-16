@@ -18,7 +18,6 @@ env:
   ARMBIAN_REF: main
   PATCHES: 4077,5076
   PATCHES_DISABLED: 5082
-  # 解决 2026 年环境下的 Node.js 弃用警告
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
@@ -27,7 +26,6 @@ permissions:
 jobs:
   prepare:
     name: Prepare
-    # 升级到 24.04 以解决编译时的 binfmt 注册问题
     runs-on: ubuntu-24.04
     outputs:
       env: ${{ steps.get.outputs.env }}
@@ -37,18 +35,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 优先尝试从 API 获取，失败则使用系统时间
           TIME="$(curl -s https://api.github.com/repos/${SCRIPT_REPO}/actions/runs/${GITHUB_RUN_ID} | jq -r .created_at)"
           [[ "$TIME" == "null" || -z "$TIME" ]] && TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           
           TAG="ci-$(date -d "${TIME}" -u +'%Y%m%d-%H%M%S-%Z')"
 
-          # 使用 gh 确保在大规模 Matrix 下 API 请求的稳定性
           SCRIPT_SHA=$(gh api repos/${SCRIPT_REPO}/commits/${SCRIPT_REF} --template '{{.sha}}')
           UBOOT_TAG=$(gh api repos/${UBOOT_REPO}/releases/${UBOOT_RELEASE} --template '{{.tag_name}}')
           ARMBIAN_SHA=$(gh api repos/${ARMBIAN_REPO}/commits/${ARMBIAN_REF} --template '{{.sha}}')
 
-          # 完整保留原始 sed 逻辑处理
           cat <<EOF | sed -E 's/^  //' >>$GITHUB_ENV
             TIME=$TIME
             TAG=$TAG
@@ -176,7 +171,6 @@ jobs:
               USE_CCACHE=no
           sudo chown $(id -u):$(id -g) -R output/
 
-      # 补全关键步骤：上传 Artifact
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -267,7 +261,10 @@ jobs:
 
       - name: Install Dependents
         run: |
-          sudo apt update && sudo apt install -y img2simg
+          sudo apt update
+          # 在 Ubuntu 24.04 (Noble) 中，img2simg 由 android-sdk-libsparse-utils 提供
+          sudo apt install -y android-sdk-libsparse-utils
+          
           ver="v0.3.1"
           curl -L -o ./AmlImg https://github.com/hzyitc/AmlImg/releases/download/$ver/AmlImg_${ver}_linux_amd64
           chmod +x ./AmlImg
