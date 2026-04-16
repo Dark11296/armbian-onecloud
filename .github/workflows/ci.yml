@@ -18,6 +18,8 @@ env:
   ARMBIAN_REF: main
   PATCHES: 4077,5076
   PATCHES_DISABLED: 5082
+  # 强制使用 Node 24 以匹配 2026 年 GitHub Runner 的要求
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: write
@@ -25,7 +27,7 @@ permissions:
 jobs:
   prepare:
     name: Prepare
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       env: ${{ steps.get.outputs.env }}
     steps:
@@ -39,7 +41,7 @@ jobs:
           UBOOT_TAG=$(curl https://api.github.com/repos/${UBOOT_REPO}/releases/${UBOOT_RELEASE} | jq -r .tag_name)
           ARMBIAN_SHA=$(curl https://api.github.com/repos/${ARMBIAN_REPO}/commits/${ARMBIAN_REF} | jq -r .sha)
 
-          cat <<EOF | sed -E 's/^  //' >>$GITHUB_ENV
+          cat <<EOF | sed -E 's/^ //' >>$GITHUB_ENV
             TIME=$TIME
             TAG=$TAG
             SCRIPT_SHA=$SCRIPT_SHA
@@ -51,16 +53,12 @@ jobs:
       - name: Show repositories information
         run: |
           C_RESET="\e[0m"
-          C_BLACK="\e[30m"
-          C_RED="\e[31m"
           C_GREEN="\e[32m"
           C_YELLOW="\e[33m"
           C_BLUE="\e[34m"
           C_MAGENTA="\e[35m"
-          C_CYAN="\e[36m"
-          C_GRAY="\e[37m"
 
-          echo -e "$(cat <<EOF | sed -E 's/^  //'
+          echo -e "$(cat <<EOF | sed -E 's/^ //'
             TIME: ${C_GREEN}$(date -d "$TIME" +'%Y-%m-%d %H:%M:%S %Z(%:z)')${C_RESET}
             Script: ${C_BLUE}${SCRIPT_REPO}${C_RESET}@${C_MAGENTA}${SCRIPT_REF}${C_RESET}(https://github.com/${SCRIPT_REPO}/tree/${SCRIPT_REF})
                     ${C_YELLOW}${SCRIPT_SHA}${C_RESET}(https://github.com/${SCRIPT_REPO}/tree/${SCRIPT_SHA})
@@ -78,7 +76,7 @@ jobs:
             done < <(echo -e "${PATCHES}" | tr ',' '\n')
           fi
 
-          cat <<EOF | sed -E 's/^  //' >>$GITHUB_STEP_SUMMARY
+          cat <<EOF | sed -E 's/^ //' >>$GITHUB_STEP_SUMMARY
             # $(date -d "$TIME" +'%Y-%m-%d %H:%M:%S %Z(%:z)')
 
             ## Sources
@@ -94,7 +92,7 @@ jobs:
 
       - name: Generate release informations
         run: |
-          cat <<EOF | sed -E 's/^  //' | tee Release.md
+          cat <<EOF | sed -E 's/^ //' | tee Release.md
             CI $(date -d "$TIME" +'%Y-%m-%d %H:%M:%S %Z(%:z)')
 
             # Sources
@@ -124,7 +122,7 @@ jobs:
   build-debs:
     name: Build ${{ matrix.BRANCH }}
     needs: prepare
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -157,7 +155,6 @@ jobs:
 
       - name: Build
         run: |
-          # Don't update remote cache
           export GITHUB_ACTIONS=false
           sudo --preserve-env \
             ./compile.sh kernel \
@@ -184,20 +181,14 @@ jobs:
   build:
     name: Build ${{ matrix.RELEASE }}-${{ matrix.BRANCH }}-${{ matrix.TYPE == 'desktop' && matrix.DESKTOP_ENVIRONMENT || matrix.TYPE }}
     needs: [ prepare, build-debs ]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         BRANCH:
           - current
         RELEASE:
-          # - focal # Ubuntu 20.04 LTS
-          # - jammy # Ubuntu 22.04 LTS
           - noble # Ubuntu 24.04 LTS
-          # - oracular # Ubuntu 24.10
-          # - plucky # Ubuntu 25.04
-          # - buster # Debian 10
-          # - bullseye # Debian 11
           - bookworm # Debian 12
           - trixie # Debian 13
           - sid # Debian unstable
@@ -243,7 +234,6 @@ jobs:
 
       - name: Build
         run: |
-          # Don't update remote cache
           export GITHUB_ACTIONS=false
           sudo --preserve-env \
             ./compile.sh build \
@@ -266,7 +256,8 @@ jobs:
 
       - name: Install Dependents
         run: |
-          sudo apt install img2simg
+          sudo apt update
+          sudo apt install -y img2simg
 
           ver="v0.3.1"
           curl -L -o ./AmlImg https://github.com/hzyitc/AmlImg/releases/download/$ver/AmlImg_${ver}_linux_amd64
@@ -322,7 +313,7 @@ jobs:
 
       - name: Generate release informations
         run: |
-          cat <<EOF | sed -E 's/^  //' | tee Release.md
+          cat <<EOF | sed -E 's/^ //' | tee Release.md
             $(cat sha256sum | awk '{printf "%s: `%s`\n", $2, $1}')
           EOF
 
