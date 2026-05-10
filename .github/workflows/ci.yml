@@ -195,6 +195,7 @@ jobs:
           - current
         RELEASE:
           - bookworm # Debian 12
+          - trixie # Debian 13
         TYPE:
           - minimal
           - cli
@@ -203,7 +204,7 @@ jobs:
           - TYPE: desktop
             DESKTOP_ENVIRONMENT: xfce
             DESKTOP_ENVIRONMENT_CONFIG_NAME: config_base
-            DESKTOP_APPGROUPS_SELECTED: ""
+            DESKTOP_APPGROUPS_SELECTED: "minimal"
     steps:
       - name: Import env
         run: |
